@@ -1,5 +1,5 @@
 /*!
- * SubEtha Window Info v1.0.0
+ * SubEtha Window Information
  * http://github.com/bemson/subetha-client-winfo
  *
  * Copyright, Bemi Faison
@@ -8,20 +8,32 @@
 /*
 Use this plugin observe changes in all windows in the network.
 */
-/* global define, require */
-!function (inAMD, inCJS, Array, Date, Math, JSON, Object, RegExp, scope, undefined) {
+/* jshint browser:true */
+/* global define, require, self */
+!function (inAMD, inCJS, scope, undefined) {
 
-  function initSubEthaWindows() {
+  function initSubEthaWinfo() {
 
     var
       subetha = ((inCJS || inAMD) ? require('subetha') : scope.Subetha),
-      protoSlice = Array.prototype.slice,
-      protoHas = Object.prototype.hasOwnProperty,
       monitor = new subetha.Client(),
-      lastInfo,
+
+      protoHas = Object.prototype.hasOwnProperty,
+      sharedHeadObj,
+      monitoring,
+      positionWatchInt,
+      winMetrics,
+      windowId,
+      lastCoord,
 
       doc = scope.document,
       docBody,
+      docHead,
+
+      // array of windows for public consumption
+      winAry = [],
+      // collection of window objects for private management
+      winObjs = {},
 
       // utility
       bind = scope.attachEvent ?
@@ -38,32 +50,19 @@ Use this plugin observe changes in all windows in the network.
         function (object, eventName, callback) {
           object.removeEventListener(eventName, callback, false);
         },
-
-      // array of windows
-      winfo = [],
-      stageDiv
+      next =
+        // use setImmediate
+        (
+          typeof setImmediate === 'function' &&
+          setImmediate
+        ) ||
+        // use nextTick (for nodeJS only)
+        (inCJS && process.nextTick) ||
+        // fallback to slower setTimeout call
+        function (fn) {
+          setTimeout(fn, 0);
+        }
     ;
-
-    // add event emitter and expose winfo
-    mix(winfo, subetha.EventEmitter.prototype);
-    subetha.winfo = winfo;
-
-    // exit if within an iframe
-    if (scope !== self) {
-      /*
-      Can't work in iframe until we can
-      groups iframes in the same window
-      subetha doesn't do windows... :-(
-      */
-      winfo.unsupported = 1;
-      return subetha;
-    }
-
-    // create stage div
-    stageDiv = doc.createElement('div');
-    stageDiv.style.cssText = css_reset + 'position:fixed;overflow:visible;';
-    stageDiv.setAttribute('data-owner', 'subetha-winfo');
-
 
     // UTILITY
 
@@ -84,290 +83,479 @@ Use this plugin observe changes in all windows in the network.
       return base;
     }
 
-
-    // add styles to reset appearance of div
-    function setResetStyles(node) {
-      var style = node.style;
-      // is marginally faster than .cssText?
-      style.position = 'absolute';
-      style.width =
-      style.height =
-      style.margin =
-      style.padding =
-      style.background =
-      style.lineHeight =
-      style.fontSize =
-        0;
-      style.border = 'none';
+    function ArrayIndexOf(ary, item) {
+      var
+        idx = -1,
+        ln = ary.length;
+      while (ln--) {
+        if (ary[ln] === item) {
+          idx = ln;
+          break;
+        }
+      }
+      return idx;
     }
 
-    // Functions
+    // determine if the window has focus
+    function hasFocus() {
+      var hiddenPropName;
 
-    function initMonitor() {
+      if (typeof doc.hidden !== "undefined") {
+          hiddenPropName = "hidden";
+      } else if (typeof doc.mozHidden !== "undefined") {
+          hiddenPropName = "mozHidden";
+      } else if (typeof doc.msHidden !== "undefined") {
+          hiddenPropName = "msHidden";
+      } else if (typeof doc.webkitHidden !== "undefined") {
+          hiddenPropName = "webkitHidden";
+      }
 
-      if (initialized) {
+      if (hiddenPropName && (hiddenPropName in doc)) {
+        // has focus when hidden is false
+        return !doc[hiddenPropName];
+      } else {
+        // use fallback API
+        return doc.hasFocus();
+      }
+    }
+
+    // FUNCTIONS
+
+    function startMonitor() {
+
+      // exit if already monitoring
+      if (monitoring) {
         return;
       }
 
-      initialized = 1;
+      monitoring = 1;
 
-      docBody = doc.body;
+      // listen to window events
+      rigWindow();
 
-      buildStage();
+      // start watching window, if focused
+      if (hasFocus()) {
+        watchWindowPosition();
+      }
+    }
 
-      // init winfo on self
-      moniotor.winfo = getWindowinfo();
-      addWindoid(moniotor);
+    function stopMonitor() {
+      if (!monitoring) {
+        return;
+      }
+      monitoring = 0;
 
-      // start watching window motion, when this window is focused
-      bind(win, 'focus', onFocus);
-      // stop watching window motion, when this window is blurred
-      bind(win, 'blur', onBlur);
+      unrigWindow();
+      unwatchWindowPosition();
+    }
+
+    function rigWindow() {
+      // starts watching window motion, when this window is focused
+      bind(scope, 'focus', onFocus);
+      // stops watching window motion, when this window is blurred
+      bind(scope, 'blur', onBlur);
       // always observe scroll changes
-      bind(win, 'scroll', onScroll);
+      bind(scope, 'scroll', onScroll);
       // always observe resize changes
-      bind(win, 'resize', onResize);
-
-      // do blur or focus action now
-      if (doc.hasFocus()) {
-        onFocus();
-      } else {
-        onBlur();
-      }
+      bind(scope, 'resize', onResize);
     }
 
-
-    // uses dom for shared window id
-    function getWindowId() {
-      var
-        head = doc.getElementsByTagName('head')[0],
-        id = head.getAttribute(WINDOW_ID_ATTR);
-
-      if (!id) {
-        id = subetha.guid();
-        head.setAttribute(WINDOW_ID_ATTR, id);
-      }
-      return id;
+    function unrigWindow() {
+      unbind(scope, 'focus', onFocus);
+      unbind(scope, 'blur', onBlur);
+      unbind(scope, 'scroll', onScroll);
+      unbind(scope, 'resize', onResize);
     }
 
-    function watchWindowRegion() {
-      var curInfo = getWindowInfo();
+    function isActiveMonitor() {
+      return sharedHeadObj.mid == monitor.id;
+    }
+
+    function getDocHeight() {
+      return scope.innerHeight;
+    }
+
+    function getDocWidth() {
+      return scope.innerWidth;
+    }
+
+    function getDocScroll() {
+      return {
+        scrollx: scope.pageXOffset,
+        scrolly: scope.pageYOffset
+      };
+    }
+
+    function getBrowserHeight() {
+      return scope.outerHeight;
+    }
+
+    function getBrowserWidth() {
+      return scope.outerWidth;
+    }
+
+    function getWindowPosition() {
+      return {
+        x: scope.screenX,
+        y: scope.screenY
+      };
+    }
+
+    function getWindowDimensions() {
+      return {
+        width: getDocWidth(),
+        height: getDocHeight(),
+        bwidth: getBrowserWidth(),
+        bheight: getBrowserHeight()
+      };
+    }
+
+    function watchWindowPosition() {
+      unwatchWindowPosition();
+      positionWatchInt = setInterval(checkWindowPosition, 100);
+    }
+
+    function unwatchWindowPosition() {
+      clearInterval(positionWatchInt);
+    }
+
+    function checkWindowPosition() {
+      var curCoord = getWindowPosition();
 
       if (
-        !lastRegion ||
-        lastRegion.x !== curRegion.x ||
-        lastRegion.y !== curRegion.y ||
-        lastRegion.width !== curRegion.width ||
-        lastRegion.height !== curRegion.height
+        !lastCoord ||
+        lastCoord.x != curCoord.x ||
+        lastCoord.y != curCoord.y
       ) {
-        lastRegion = curRegion;
-        bird.send('lead', lastRegion);
+        lastCoord = curCoord;
+        // passing width and height, since those may have updated as well
+        updateWindowMetrics(mix(lastCoord, getWindowDimensions()));
       }
-    }
-
-    function getWindowInfo() {
-      return {
-        x: getScreenX(),
-        y: getScreenY(),
-        width: outerWidth,
-        height: outerHeight
-      };
     }
 
     // start watching for window changes
     function onFocus() {
       // start watching window
-      // broadcast info
+      watchWindowPosition();
+      // broadcast focus change
+      updateWindowMetrics({focus: true});
     }
 
     // stop watching for window changes
     function onBlur() {
-      // stop watching window
-      // broadcast info
+      // stop watching window position
+      unwatchWindowPosition();
+      // broadcast focus change
+      updateWindowMetrics({focus: false});
     }
 
     // update scroll position
     function onScroll() {
-      // only update scroll details
-      // broadcast info
+      // broadcast scroll change
+      updateWindowMetrics(getDocScroll());
     }
 
     // update changed dimensions
     function onResize() {
       // retrieve all, since resizing can occur from any corner
-      // broadcast info
+      updateWindowMetrics(mix(getWindowDimensions(), getWindowPosition()));
     }
 
-    function appendStage() {
-      if (stageDiv.parentNode !== docBody) {
-        positionStage();
-        docBody.appendChild(stageDiv);
-      }
+    function fireAddWindowEvent(wid, winfo) {
+      winAry.fire('add', wid, winfo);
     }
 
-    function positonStage() {
-      stageDiv.style.top = -getScreenX() + 'px';
-      stageDiv.style.left = -getScreenY() + 'px';
+    function fireRemoveWindowEvent(wid, winfo) {
+      winAry.fire('remove', wid, winfo);
     }
 
-    function buildStage() {
+    function fireUpdateWindowEvent(wid, winfo, changes) {
+      winAry.fire('update', wid, winfo, changes);
+    }
+
+    function updateWindowMetrics(data) {
       var
-        pid,
-        coords,
-        div,
-        peers = monitor.peers;
-
-      // remove stage from dom
-      if (stageDiv.parentNode) {
-        stageDiv.parentNode.removeChild(stageDiv);
-      }
-      // empty div
-      stageDiv.innerHTML = '';
-      // clear winfo array
-      winfo.length = 0;
-      // repopulate stage and winfo with peers
-      for (pid in peers) {
-        if (protoHas.call(peers, pid)) {
-          coords = monitor.peers[pid].winfo;
-          div = monitor.peers[pid].div;
-
-          // add to public array
-          winfo.push(coords);
-
-          // update peer div
-          div.style.width = coords.width + 'px';
-          div.style.height = coords.height + 'px';
-          div.style.top = coords.x + 'px';
-          div.style.left = coords.y + 'px';
-
-          // add to stage
-          stageDiv.appendChild(div);
+        changed = {},
+        deets = winMetrics.deets,
+        key,
+        value,
+        hasChanges
+      ;
+      // keep changed values
+      for (key in data) {
+        if (
+          protoHas.call(data, key) &&
+          (
+            !protoHas.call(deets, key) ||
+            deets[key] != (value = data[key])
+          )
+        ) {
+          // capture changed value
+          changed[key] =
+          // update metric
+          deets[key] =
+            value;
+          // not that there is something to send
+          hasChanges = 1;
         }
       }
 
-      // re-append if allowed
-      appendStage();
+      // exit if nothing has changed
+      if (!hasChanges) {
+        return;
+      }
+
+      // broadcast changed/new values
+      sendWindowMetrics(changed);
+
+      // notify self
+      next(function () {
+        fireUpdateWindowEvent(windowId, deets, changed);
+      });
     }
 
-    // setup monitor
-    monitor.open('window-dimensions@public')
-      .on('::connect', function () {
-        var xid;
-
-        // ask for ids
-        if (xid = monitor.ask('window id?', getWindowId())) {
-          // mark end of this exchange
-          monitor.on('::exchange-complete', function askForIds(phrase, exId) {
-            // exit when not this conversation
-            if (xid != exId) {
-              return;
-            }
-            // remove this listener
-            monitor.off('::exchange-complete', askForIds);
-            // initialize monitor
-            initMonitor();
-          });
-        }
-
-      })
-      .on('::join', function (peer) {
-        // add div to represent peer (window)
-        peer.div = document.createElement('div');
-      })
-      .on('::drop', function (peer) {
-        stageDiv.removeChild(peer.div);
-      })
-      // handle coordinates change
-      .on('coords', function (evt, coords) {
-        var peer = evt.peer;
-
-        // capture window information in peer and array
-        evt.peer.winfo =
-        winfo[peer.idx] =
-          coords;
-
-        // notify change in peer window
-        winfo.fire('changed', peer, pinfo);
-      })
-      // handle style changes
-      .on('style', function () {
-
+    function sendWindowMetrics(data, target) {
+      monitor._transmit('subetha/winfo', target, {
+        id: windowId,
+        cnt: sharedHeadObj.cnt,
+        deets: data
       });
+    }
 
-    // adhoc response to window id
-    monitor.adhoc('window id?', function (convo, wid) {
-      var peer = convo.peer;
+    // IMPLEMENTATION
 
-      peer.wid = wid;
-      convo.reply('wid', getWindowId());
+    // add event emitter and expose winfo
+    mix(winAry, subetha.EventEmitter.prototype);
+    subetha.winfo = winAry;
 
-      // if not already watching this window
-      if (!protoHas.call(watching, wid)) {
-        // flag that this peer should be watched
-        peer.watching =
-        // note that this window is being watched
-        watching[wid] =;
-          1;
-        // start monitoring
-        initMonitor():
-      } else {
-        peer.watching = 0;
-      }
-    });
+    if (scope == self) {
 
-    // adhoc receipt of window id response
-    monitor.adhoc('window id?', 'wid', function (convo, wid) {
-      var peer = convo.peer;
+      // setup monitor
+      monitor.open('window-information@public')
+        .on('::connect', function () {
+          var me = this;
 
-      // capture id of window being watched by this peer
-      peer.wid = wid
-      // convo.end();
+          docBody = doc.body;
+          docHead = doc.head;
 
-      if () {
-        // don't track own window
-        // if not already tracking a window
-        if (!monitor.tracking) {
-          // update own window with this one
-          monitor.tracking = 1;
-          // flag that this peer is our mirror
-          convo.peer.mirror = 1;
+          // resolve tracker for all window monitors
+          if (!protoHas.call(docHead, '_winfo')) {
+            // init shared tracker
+            docHead._winfo = {
+              // window id
+              wid: subetha.guid(),
+              // id of monitor tracking this window
+              mid: me.id,
+              // number of monitors for this window
+              cnt: 0
+            };
+          }
+
+          // alias shared object
+          sharedHeadObj = docHead._winfo;
+          // increment monitor count
+          sharedHeadObj.cnt++;
+
+          // alias window id
+          windowId = sharedHeadObj.wid;
+
+          if (isActiveMonitor()) {
+            // create and add winMetrics to public array
+            winMetrics =
+            winObjs[windowId] = {
+              id: windowId,
+              cnt: sharedHeadObj.cnt,
+              deets: mix(
+                {
+                  focus: hasFocus()
+                },
+                getWindowPosition(),
+                getWindowDimensions(),
+                getDocScroll()
+              )
+            };
+
+            winAry[0] = winMetrics.deets;
+
+            // start watching window
+            startMonitor();
+
+            // announce this window to self next
+            next(function () {
+              fireAddWindowEvent(windowId, winMetrics.deets);
+            });
+            setTimeout(function () {
+              // introduce this window to peers
+              sendWindowMetrics(winMetrics.deets);
+            },5);
+          }
+        })
+        .on('::disconnect', function () {
+          // clean up & destroy monitor
+          monitor.off();
+
+          // decrement number of monitors for this page
+          sharedHeadObj.cnt--;
+
+          // if this monitor was currently tracking this window
+          if (isActiveMonitor()) {
+            // stop watching the window
+            stopMonitor();
+          }
+
+          // if no other monitors remain...
+          if (!sharedHeadObj.cnt) {
+            // remove winfo tracker from HEAD node
+            delete docHead._winfo;
+            // clear public array
+            winAry.length = 0;
+          }
+
+          // nullify local reference
+          sharedHeadObj = 0;
+        })
+        .on('::join', function (peer, exists) {
+          // exit pre-existing peers
+          if (exists) {
+            return;
+          }
+
+          // send metrics to peer
+          sendWindowMetrics(winMetrics.deets, peer);
+        })
+        .on('::drop', function (peer) {
+          var
+            wid = peer.wid,
+            winfo,
+            idx;
+
+          // exit if there is no window information associated with this peer
+          if (!wid || !protoHas.call(winObjs, wid)) {
+            return;
+          }
+          winfo = winObjs[wid];
+
+          // decrement number of monitors
+          winfo.cnt--;
+
+          // if this peer was monitoring this window...
+          if (sharedHeadObj.mid == peer.id) {
+            // set monitor self
+            sharedHeadObj.mid = this.id;
+            // use winfo as winMetric
+            winMetrics = winfo;
+            // get updated count
+            // this has already been decremented by the departing monitor
+            winMetrics.cnt = sharedHeadObj.cnt;
+            // start watching window
+            startMonitor();
+          } else if (!winfo.cnt) { // take action when there are no more monitors for this window
+            // remove deets from public array
+            if (~(idx = ArrayIndexOf(winAry, winfo.deets))) {
+              winAry.splice(idx, 1);
+            }
+            // remove window info object
+            delete winObjs[wid];
+            // announce removal of window
+            fireRemoveWindowEvent(wid, winfo.deets);
+          }
+        })
+      ;
+
+      // add subetha/winfo type
+      /*
+      payload
+      {
+        id: // window id
+        cnt: // number of monitors for this window
+        deets: { // updated window information
+          x: // x coord
+          y: // y coord
+          width: // doc width
+          height: // doc height
+          bwidth: // browser width
+          bheight: // browser height
+          scrollx: // horizontal scroll position
+          scrolly: // vertical scroll position
+          hasscrollx: // flag when has horizontal scroll bar
+          hasscrolly: // flag when has vertical scroll bar
+          focus: // focus (truthy)
         }
       }
-    });
+      */
+      subetha.msgType['subetha/winfo'] = function (client, peer, payload) {
+        var
+          deets,
+          winfo,
+          wid,
+          adding;
 
-    // expose emitter of window boundary events
-    subetha.wInfo = stage;
+        // exit when payload is invalid
+        if (
+          !payload ||
+          typeof payload != 'object' ||
+          typeof payload.cnt != 'number' ||
+          typeof (wid = payload.id) != 'string' ||
+          typeof (deets = payload.deets) != 'object' ||
+          !deets
+        ) {
+          return;
+        }
+
+        // if there is no window info object for this window
+        if (protoHas.call(winObjs, wid)) {
+          winfo = winObjs[wid];
+        } else {
+          // init window information object - start with id
+          winfo =
+          winObjs[wid] =
+            {
+              id: wid,
+              deets: {
+                id: wid
+              }
+            };
+          // add deets to public array
+          winAry.push(winfo.deets);
+          // link window to this peer - this way we can check the window when this peer disconnects
+          peer.wid = wid;
+          // flag that this update is for a new window
+          adding = 1;
+        }
+
+        // update window details
+        mix(winfo.deets, deets);
+        // update meta-data
+        winfo.cnt = payload.cnt;
+
+        if (adding) {
+          fireAddWindowEvent(wid, winfo.deets);
+        } else {
+          fireUpdateWindowEvent(wid, winfo.deets, deets);
+        }
+      };
+
+    } else {
+
+      // Can't work in iframe until we can identify which iframes belong to which window
+      winAry.unsupported = 1;
+
+    }
 
     return subetha;
   }
 
-  function setPeerDimensions(peer, dimensions) {
-    initPeer(peer);
-    peer._dim = dimensions;
-  }
-
-  function initPeer(peer) {
-    if (!protoHas.call(peer, '_dim')) {
-      peer._dim = {
-        x: 0,
-        y: 0,
-        w: 0,
-        h: 0
-      };
-    }
-  }
-
   // initialize and expose module, based on the environment
   if (inAMD) {
-    define(initSubEthaWindows);
+    define(initSubEthaWinfo);
   } else if (inCJS) {
-    module.exports = initSubEthaWindows();
-  } else if (!scope.Subetha || !scope.Subetha._vp) {
+    module.exports = initSubEthaWinfo();
+  } else if (scope.Subetha && !scope.Subetha.winfo) {
     // tack on to existing namespace
-    initSubEthaWindows();
+    initSubEthaWinfo();
   }
 }(
   typeof define === 'function',
   typeof exports != 'undefined',
-  Array, Date, Math, JSON, Object, RegExp, this
+  this
 );
