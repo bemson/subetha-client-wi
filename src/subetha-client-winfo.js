@@ -293,6 +293,10 @@ Use this plugin observe changes in all windows in the network.
     }
 
     function fireRemoveWindowEvent(wid, winfo) {
+      // remove current pointer for current window
+      if (wid == sharedHeadObj.wid) {
+        winAry.current = null;
+      }
       winAry.fire('remove', wid, winfo);
     }
 
@@ -376,7 +380,8 @@ Use this plugin observe changes in all windows in the network.
           autoReconnect = 0;
           monitor.close();
         },
-        start: openMonitor
+        start: openMonitor,
+        current: null
       }
     );
     // expose public array
@@ -433,14 +438,17 @@ Use this plugin observe changes in all windows in the network.
               )
             };
 
-            winAry[0] = winMetrics.deets;
+            winAry.current =
+            winAry[0] =
+              winMetrics.deets;
 
             // start watching window
             startMonitor();
 
             // announce this window to self next
             next(function () {
-              fireAddWindowEvent(windowId, winMetrics.deets);
+              // add "self" flag, to indicate that this is the current window
+              fireAddWindowEvent(windowId, mix({current:true}, winMetrics.deets));
             });
             setTimeout(function () {
               // introduce this window to peers
@@ -570,7 +578,8 @@ Use this plugin observe changes in all windows in the network.
             {
               id: wid,
               deets: {
-                id: wid
+                id: wid,
+                current: wid == sharedHeadObj.wid
               }
             };
           // add deets to public array
