@@ -22,6 +22,7 @@ Use this plugin observe changes in all windows in the network.
       sharedHeadObj,
       monitoring,
       positionWatchInt,
+      finalResizeInt,
       winMetrics,
       windowId,
       lastCoord,
@@ -201,6 +202,10 @@ Use this plugin observe changes in all windows in the network.
       };
     }
 
+    function updateResizeMetrics() {
+      updateWindowMetrics(mix(getWindowDimensions(), getWindowPosition()));
+    }
+
     function getWindowDimensions() {
       return {
         width: getDocWidth(),
@@ -257,8 +262,12 @@ Use this plugin observe changes in all windows in the network.
 
     // update changed dimensions
     function onResize() {
+      // kill final resize
+      clearTimeout(finalResizeInt);
       // retrieve all, since resizing can occur from any corner
-      updateWindowMetrics(mix(getWindowDimensions(), getWindowPosition()));
+      updateResizeMetrics();
+      // final resize
+      finalResizeInt = setTimeout(updateResizeMetrics, 50);
     }
 
     function fireAddWindowEvent(wid, winfo) {
