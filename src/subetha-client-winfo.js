@@ -196,9 +196,15 @@ Use this plugin observe changes in all windows in the network.
     }
 
     function getWindowPosition() {
+      var
+        bx = scope.screenX,
+        by = scope.screenY;
+
       return {
-        x: scope.screenX,
-        y: scope.screenY
+        x: bx,
+        y: by + (scope.outerHeight - scope.innerHeight),
+        bx: bx,
+        by: by,
       };
     }
 
