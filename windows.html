@@ -1,0 +1,130 @@
+<html>
+<head>
+<style>
+  body {
+    background: gray;
+  }
+
+  #screen {
+    height:80vm; width:100vm; /* IE9 fallback */
+    width: 100vmin;
+    position: absolute;
+    top:0;bottom:0;
+    left:0;right:0;
+    margin: auto;
+    background: #999;
+  }
+
+  #screen > .window {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  #screen > .window div {
+    position: absolute;
+    transition: top .5s, left .5s;
+  }
+
+  #screen > .window > div:first-child {
+    background: #ccc;
+    border-radius: .25em;
+  }
+
+  #screen > .window > div:last-child {
+    background: #eee;
+    border-bottom-left-radius: .25em;
+    border-bottom-right-radius: .25em;
+  }
+</style>
+  <script src="../subetha/subetha.min.js"></script>
+  <script src="../subetha-client-winfo/src/subetha-client-winfo.js"></script>
+  <script>
+var
+  availTop = screen.availTop || 0,
+  screenWidth = screen.width,
+  screenHeight = screen.height - availTop,
+  winfo = Subetha.winfo,
+  inited,
+  $screen = document.createElement('div'),
+  windoidTpl = $screen.cloneNode();
+
+windoidTpl.setAttribute('class', 'window');
+windoidTpl.appendChild($screen.cloneNode());
+windoidTpl.appendChild($screen.cloneNode());
+
+$screen.setAttribute('id', 'screen');
+$screen.style.height = screenHeight/screenWidth * 100 + ((document.all) ? 'vm' : 'vmin');
+
+
+function updateWindoid(ref, deets) {
+  if (typeof ref == 'string') {
+    ref = $screen.querySelector('div[data-wid="' + ref + '"]');
+    if (!ref) {
+      return;
+    }
+  }
+  setWindoid(ref, deets);
+}
+
+function setWindoid(windoid, deets) {
+  var
+    brwsr = windoid.firstChild,
+    doc = windoid.lastChild;
+
+  windoid.style.opacity = deets.focus ? .8 : .4;
+
+  brwsr.style.top = getPercentOfHeight(deets.by - availTop) + '%';
+  doc.style.top = getPercentOfHeight(deets.y - availTop) + '%';
+
+  brwsr.style.left =
+  doc.style.left =
+    getPercentOfWidth(deets.bx) + '%';
+
+  brwsr.style.width =
+  doc.style.width =
+    getPercentOfWidth(deets.bwidth) + '%';
+
+  brwsr.style.height = getPercentOfHeight(deets.bheight) + '%';
+  doc.style.height = getPercentOfHeight(deets.height) + '%';
+}
+
+function getPercentOfWidth(n) {
+  return n/screenWidth * 100;
+}
+
+function getPercentOfHeight(n) {
+  return n/screenHeight * 100;
+}
+
+winfo
+  .on('add', function (id, deets) {
+    var wind = windoidTpl.cloneNode(true);
+
+    if (!inited) {
+      inited = 1;
+      document.body.appendChild($screen);
+    }
+
+    wind.setAttribute('data-wid', id);
+    setWindoid(wind, deets);
+
+    $screen.appendChild(wind);
+  })
+  .on('update', updateWindoid)
+  .on('remove', function (id) {
+    var $wind = $screen.querySelector('div[data-wid="' + id + '"]');
+    if (!$wind) {
+      return;
+    }
+    $screen.removeChild($wind);
+  });
+
+  </script>
+</head>
+<body>
+
+</body>
+</html>
