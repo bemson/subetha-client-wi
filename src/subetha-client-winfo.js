@@ -26,6 +26,7 @@ Use this plugin observe changes in all windows in the network.
       winMetrics,
       windowId,
       lastCoord,
+      autoReconnect = 1,
 
       doc = scope.document,
       docBody,
@@ -97,6 +98,13 @@ Use this plugin observe changes in all windows in the network.
       return idx;
     }
 
+    function removeFromArray(ary, item) {
+      var idx = ArrayIndexOf(ary, item);
+      if (~idx) {
+        ary.splice(idx, 1);
+      }
+    }
+
     // determine if the window has focus
     function hasFocus() {
       var hiddenPropName;
@@ -121,6 +129,10 @@ Use this plugin observe changes in all windows in the network.
     }
 
     // FUNCTIONS
+
+    function openMonitor() {
+      monitor.open('window-information@public');
+    }
 
     function startMonitor() {
 
@@ -337,16 +349,47 @@ Use this plugin observe changes in all windows in the network.
       });
     }
 
+    function removeAllWindows() {
+      var
+        windoid,
+        wid;
+
+      for (wid in winObjs) {
+        if (protoHas.call(winObjs, wid)) {
+          windoid = winObjs[wid];
+          fireRemoveWindowEvent(windoid.id, windoid.deets);
+        }
+      }
+      winObjs = {};
+      winAry.length = 0;
+    }
+
     // IMPLEMENTATION
 
-    // add event emitter and expose winfo
-    mix(winAry, subetha.EventEmitter.prototype);
+    // enchance winfo array
+    mix(winAry,
+      // add event emitter and expose winfo
+      subetha.EventEmitter.prototype,
+      {
+        // stop monitoring windows
+        stop: function () {
+          autoReconnect = 0;
+          monitor.close();
+        },
+        start: openMonitor
+      }
+    );
+    // expose public array
     subetha.winfo = winAry;
+
 
     if (scope == self) {
 
+      // simple flag indicating whether winfo can work
+      winAry.unsupported = 0;
+
       // setup monitor
-      monitor.open('window-information@public')
+      monitor
         .on('::connect', function () {
           var me = this;
 
@@ -406,9 +449,6 @@ Use this plugin observe changes in all windows in the network.
           }
         })
         .on('::disconnect', function () {
-          // clean up & destroy monitor
-          monitor.off();
-
           // decrement number of monitors for this page
           sharedHeadObj.cnt--;
 
@@ -420,10 +460,16 @@ Use this plugin observe changes in all windows in the network.
 
           // if no other monitors remain...
           if (!sharedHeadObj.cnt) {
-            // remove winfo tracker from HEAD node
+            // // remove winfo tracker from HEAD node
             delete docHead._winfo;
-            // clear public array
-            winAry.length = 0;
+            // remove winMetrics' details from public array
+            removeFromArray(winAry, winMetrics.deets);
+            if (autoReconnect) {
+              // monitor should always be active?
+              next(openMonitor);
+            }
+            autoReconnect = 1;
+            removeAllWindows();
           }
 
           // nullify local reference
@@ -441,8 +487,7 @@ Use this plugin observe changes in all windows in the network.
         .on('::drop', function (peer) {
           var
             wid = peer.wid,
-            winfo,
-            idx;
+            winfo;
 
           // exit if there is no window information associated with this peer
           if (!wid || !protoHas.call(winObjs, wid)) {
@@ -466,9 +511,7 @@ Use this plugin observe changes in all windows in the network.
             startMonitor();
           } else if (!winfo.cnt) { // take action when there are no more monitors for this window
             // remove deets from public array
-            if (~(idx = ArrayIndexOf(winAry, winfo.deets))) {
-              winAry.splice(idx, 1);
-            }
+            removeFromArray(winAry, winfo.deets);
             // remove window info object
             delete winObjs[wid];
             // announce removal of window
@@ -549,6 +592,9 @@ Use this plugin observe changes in all windows in the network.
           fireUpdateWindowEvent(wid, winfo.deets, deets);
         }
       };
+
+      // connect to network
+      openMonitor();
 
     } else {
 
