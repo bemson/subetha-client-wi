@@ -1,0 +1,26 @@
+{
+  "name": "subetha-client-wi",
+  "version": "0.0.0-alpha",
+  "description": "Publish window details over SubEtha",
+  "main": "src/subetha-client-wi.js",
+  "peerDependencies": {
+    "subetha-client": "0.x"
+  },
+  "keywords": [
+    "browser",
+    "window",
+    "monitor",
+    "subetha",
+    "plugin"
+  ],
+  "author": {
+    "name": "Bemi Faison",
+    "email": "bemson@gmail.com",
+    "url": "https://github.com/bemson"
+  },
+  "repository": {
+    "type": "git",
+    "url": "http://github.com/bemson/subetha-client-wi.git"
+  },
+  "licenses": ["MIT"]
+}

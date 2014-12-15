@@ -1,0 +1,22 @@
+{
+  "name": "subetha-client-wi",
+  "repository": "bemson/subetha-client-wi",
+  "description": "Publish window details over SubEtha",
+  "version": "0.0.0-alpha",
+  "keywords": [
+    "browser",
+    "window",
+    "monitor",
+    "subetha",
+    "plugin"
+  ],
+  "dependencies": {
+    "bemson/subetha-client": "0.x"
+  },
+  "development": {},
+  "license": "MIT",
+  "main": "src/subetha-client-wi.js",
+  "scripts": [
+    "src/subetha-client-wi.js"
+  ]
+}
