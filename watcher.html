@@ -3,6 +3,7 @@
 <style>
   body {
     background: gray;
+    font-family: sans-serif;
   }
 
   #screen {
@@ -34,6 +35,16 @@
     border-radius: .25em;
   }
 
+  #screen > .window > .label {
+    margin: auto;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 2.5em;
+    font-size: 2vmin;
+    text-align: center;
+  }
+
   #screen > .window > div:last-child {
     background: #eee;
     border-bottom-left-radius: .25em;
@@ -55,6 +66,9 @@ var
 windoidTpl.setAttribute('class', 'window');
 windoidTpl.appendChild($screen.cloneNode());
 windoidTpl.appendChild($screen.cloneNode());
+windoidTpl.lastChild.className = 'label';
+windoidTpl.lastChild.appendChild($screen.cloneNode());
+windoidTpl.appendChild($screen.cloneNode());
 
 $screen.setAttribute('id', 'screen');
 $screen.style.height = screenHeight/screenWidth * 100 + ((document.all) ? 'vm' : 'vmin');
@@ -73,23 +87,29 @@ function updateWindoid(ref, deets) {
 function setWindoid(windoid, deets) {
   var
     brwsr = windoid.firstChild,
+    label = windoid.childNodes[1],
     doc = windoid.lastChild;
 
   windoid.style.opacity = deets.focus ? .8 : .4;
 
-  brwsr.style.top = getPercentOfHeight(deets.by - availTop) + '%';
+  brwsr.style.top =
+  label.style.top =
+    getPercentOfHeight(deets.by - availTop) + '%';
   doc.style.top = getPercentOfHeight(deets.y - availTop) + '%';
 
   brwsr.style.left =
+  label.style.left =
   doc.style.left =
     getPercentOfWidth(deets.bx) + '%';
 
   brwsr.style.width =
   doc.style.width =
+  label.style.width =
     getPercentOfWidth(deets.bwidth) + '%';
 
   brwsr.style.height = getPercentOfHeight(deets.bheight) + '%';
   doc.style.height = getPercentOfHeight(deets.height) + '%';
+  label.style.height = getPercentOfHeight(deets.bheight - deets.height) + '%';
 }
 
 function getPercentOfWidth(n) {
@@ -110,6 +130,7 @@ winfo
     }
 
     wind.setAttribute('data-wid', id);
+    wind.childNodes[1].innerHTML = id;
     setWindoid(wind, deets);
 
     $screen.appendChild(wind);
