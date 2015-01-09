@@ -7,6 +7,23 @@
     font-family: sans-serif;
   }
 
+  .notice {
+    color: #444;
+    font-size: .8em;
+    opacity: .5;
+    transition: opacity .5s;
+  }
+
+  .notice a,
+  .notice a:visited,
+  .notice a:active {
+    color: #fc3;
+  }
+
+  .notice:hover {
+    opacity: 1;
+  }
+
   #screen {
     height:80vm; width:100vm; /* IE9 fallback */
     width: 100vmin;
@@ -76,17 +93,17 @@ var
   $screen = document.createElement('div'),
   windoidTpl = $screen.cloneNode();
 
-// add text to screen
-$screen.appendChild($screen.cloneNode());
-$screen.firstChild.innerHTML = 'SubEtha WI Demo';
-$screen.firstChild.className = 'abs-center sign';
-
 windoidTpl.setAttribute('class', 'window');
 windoidTpl.appendChild($screen.cloneNode());
 windoidTpl.appendChild($screen.cloneNode());
 windoidTpl.lastChild.className = 'label';
 windoidTpl.lastChild.appendChild($screen.cloneNode());
 windoidTpl.appendChild($screen.cloneNode());
+
+// add text to screen
+$screen.appendChild($screen.cloneNode());
+$screen.firstChild.innerHTML = 'SubEtha WI Demo';
+$screen.firstChild.className = 'abs-center sign';
 
 $screen.setAttribute('id', 'screen');
 $screen.className = 'abs-center';
@@ -163,6 +180,6 @@ winfos
   </script>
 </head>
 <body>
-
+<span class="notice"><a href="https://github.com/bemson/subetha-client-wi">SubEtha Window Information Plugin</a> for <a href="https://github.com/bemson/subetha-client">SubEtha Client</a> | &copy; 2015, Sandford Bemi Faison</span>
 </body>
 </html>
