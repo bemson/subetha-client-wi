@@ -18,6 +18,7 @@ Use this plugin observe changes in all windows in the network.
       subetha = ((inCJS || inAMD) ? require('subetha') : scope.Subetha),
       monitor = new subetha.Client(),
 
+      DEFAULT_URL = 'public',
       protoHas = Object.prototype.hasOwnProperty,
       sharedHeadObj,
       monitoring,
@@ -26,6 +27,7 @@ Use this plugin observe changes in all windows in the network.
       winMetrics,
       windowId,
       lastCoord,
+      lastBridgeUrl,
       autoReconnect = 1,
 
       doc = scope.document,
@@ -130,8 +132,28 @@ Use this plugin observe changes in all windows in the network.
 
     // FUNCTIONS
 
-    function openMonitor() {
-      monitor.open('window-information@public');
+    function openMonitor(url) {
+      // use last if url is invalid
+      if (!url || typeof url != 'string') {
+        url = winAry.url;
+      }
+      // use default when cached or given are invalid
+      if (!url || typeof url != 'string') {
+        url = DEFAULT_URL;
+      }
+      // open when not open or using different url
+      if (monitor.state != 3 || url != monitor.url) {
+        // capture url
+        winAry.url = url;
+        // don't auto-reconnect if about to closing
+        if (monitor.state > 2) {
+          autoReconnect = 0;
+        }
+        // (re)open client
+        monitor.open('subetha/wi@' + url);
+        return true;
+      }
+      return false;
     }
 
     function startMonitor() {
@@ -216,7 +238,7 @@ Use this plugin observe changes in all windows in the network.
         x: bx,
         y: by + (scope.outerHeight - scope.innerHeight),
         bx: bx,
-        by: by,
+        by: by
       };
     }
 
@@ -381,7 +403,8 @@ Use this plugin observe changes in all windows in the network.
           monitor.close();
         },
         start: openMonitor,
-        current: null
+        current: null,
+        url: DEFAULT_URL
       }
     );
     // expose public array
@@ -396,15 +419,25 @@ Use this plugin observe changes in all windows in the network.
       // setup monitor
       monitor
         .on('::connect', function () {
-          var me = this;
+          var
+            me = this,
+            bridgeUrl = me.url
+          ;
 
-          docBody = doc.body;
-          docHead = doc.head;
+          if (!docBody) {
+            docBody = doc.body;
+            docHead = doc.head;
+          }
 
           // resolve tracker for all window monitors
-          if (!protoHas.call(docHead, '_winfo')) {
+          if (!protoHas.call(docHead, '_wi')) {
             // init shared tracker
-            docHead._winfo = {
+            docHead._wi = {};
+          }
+          if (!protoHas.call(docHead._wi, bridgeUrl)) {
+            // capture initial bridgeUrl
+            lastBridgeUrl = bridgeUrl;
+            docHead._wi[bridgeUrl] = {
               // window id
               wid: subetha.guid(),
               // id of monitor tracking this window
@@ -415,7 +448,7 @@ Use this plugin observe changes in all windows in the network.
           }
 
           // alias shared object
-          sharedHeadObj = docHead._winfo;
+          sharedHeadObj = docHead._wi[bridgeUrl];
           // increment monitor count
           sharedHeadObj.cnt++;
 
@@ -457,6 +490,12 @@ Use this plugin observe changes in all windows in the network.
           }
         })
         .on('::disconnect', function () {
+          var
+            headWinfo = docHead._wi,
+            wid,
+            hasMoreNetworks
+          ;
+
           // decrement number of monitors for this page
           sharedHeadObj.cnt--;
 
@@ -468,8 +507,23 @@ Use this plugin observe changes in all windows in the network.
 
           // if no other monitors remain...
           if (!sharedHeadObj.cnt) {
-            // // remove winfo tracker from HEAD node
-            delete docHead._winfo;
+
+            // clearn up head tracker
+            if (headWinfo) {
+              // remove this winfo tracker from HEAD node
+              delete headWinfo[lastBridgeUrl];
+              // check if other window trackers exist
+              for (wid in headWinfo) {
+                if (protoHas.call(headWinfo, wid)) {
+                  hasMoreNetworks = 1;
+                  break;
+                }
+              }
+              // remove when no other window monitoring networks exist
+              if (!hasMoreNetworks) {
+                delete docHead._wi;
+              }
+            }
             // remove winMetrics' details from public array
             removeFromArray(winAry, winMetrics.deets);
             if (autoReconnect) {

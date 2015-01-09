@@ -136,7 +136,7 @@ Subetha.winfos.on('update', function (winfo, changed) {
 
 #### Controlling Functionality
 
-By default, WI will connect to "subetha/winfo@public", and begin syncing window details. To prevent this behavior invoke the static `stop()` method. To reestablish and resume monitoring, invoke the static `start()` method.
+By default, WI will connect to "subetha/wi@public", and begin syncing window details. To prevent this behavior invoke the static `stop()` method. To reestablish and resume monitoring, invoke the static `start()` method.
 
 Below demonstrates stopping the default monitoring behavior, then resuming it based on preferences or user confirmation.
 
@@ -153,6 +153,25 @@ if (userPrefs.monitor_me || confirm('Share window details?')) {
 
 Once disabled (via `winfos.stop()`), the `winfos` array is emptied, and `winfos.current` is set to `null`. As well, prior to removal, the _remove_ event will fire for all existing winfo objects.
 
+##### Changing Networks
+
+To connect to own network, provide the url (or url-alias) of your bridge, via the `winfos.start()` method. The url gets captured in the `winfos.url` property, for future connection attempts.
+
+Below demonstrates how to publish and synchronization window details with a different bridge.
+
+```js
+Subetha.winfos.start('my.com/bridge/url');
+```
+
+The above example could also be set as a configuration. WI would uses this url by default, during initialization.
+
+```js
+Subetha.winfos.url = 'my.com/bridge/url';
+```
+
+**Note:** WI does not provide or allow passing credentials currently. This will likely change in a future release.
+
+
 ## API
 
 Below is reference documentation for the SubEtha Window Information module - which are additions to [SubEtha-Client module](https://github.com/bemson/subetha-client).
@@ -163,13 +182,13 @@ Below is reference documentation for the SubEtha Window Information module - whi
 
 #### winfos#start()
 
-Begin monitoring this and other windows on the network.
+Begin monitoring this and other windows.
 
 ```
-Subetha.winfos.start([network]);
+Subetha.winfos.start([url]);
 ```
 
-  * **network**: (string) The network to synchronize winfo objects, in the ofrmat "channel@url". The `winfos.network` property is updated or used when this argument is given or omitted, respectively.
+  * **url**: (string) The bridge url that will host window synchronization. The `winfos.url` property is updated or retrieved when this argument is given or omitted, respectively.
 
 Returns `true` if monitoring begins. Otherwise, `false`.
 
@@ -177,7 +196,7 @@ This function does nothing when the given network is already active. If not, the
 
 #### winfos#stop()
 
-Stop monitoring this and other windows on the network.
+Stop monitoring this and other windows.
 
 ```
 Subetha.winfos.stop();
@@ -189,15 +208,15 @@ Returns `true` when the network is changed from active to inactive. Otherwise, `
 
 The winfo object of the current window, when actively monitoring a network. Otherwise, when inactive, this is a `null` reference.
 
-#### winfos@network
+#### winfos@url
 
-A string reflecting the last/currently active network. This property is used when calling `winfos.start()` with no arguments.
+A string reflecting the last/currently active (bridge) url. This property is used when calling `winfos.start()` with no arguments, and updated when called with arguments.
 
 #### winfos@unsupported
 
 A boolean indicating when the WI plugin can not work with the given docuemnt.
 
-This property should be considered _read-only_ and is set during plugin initialization. The property is `false` (i.e., WI is unsupported) for iframed documents.
+This property should be considered _read-only_ and is set during plugin initialization. The value will be `false` for iframed documents.
 
 
 ## Installation
