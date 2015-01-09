@@ -27,7 +27,7 @@
     "components",
     "README.md",
     "LICENSE",
-    "watcher.html",
+    "wi_demo_visualizer.html",
     "subetha-client-wi.min.js"
   ]
 }
