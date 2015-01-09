@@ -1,6 +1,6 @@
 /*!
  * SubEtha Window Information
- * http://github.com/bemson/subetha-client-winfo
+ * http://github.com/bemson/subetha-client-wi
  *
  * Copyright, Bemi Faison
  * Released under the MIT License
@@ -385,7 +385,7 @@ Use this plugin observe changes in all windows in the network.
       }
     );
     // expose public array
-    subetha.winfo = winAry;
+    subetha.winfos = winAry;
 
 
     if (scope == self) {
@@ -453,7 +453,7 @@ Use this plugin observe changes in all windows in the network.
             setTimeout(function () {
               // introduce this window to peers
               sendWindowMetrics(winMetrics.deets);
-            },5);
+            }, 5);
           }
         })
         .on('::disconnect', function () {
@@ -620,7 +620,7 @@ Use this plugin observe changes in all windows in the network.
     define(initSubEthaWinfo);
   } else if (inCJS) {
     module.exports = initSubEthaWinfo();
-  } else if (scope.Subetha && !scope.Subetha.winfo) {
+  } else if (scope.Subetha && !scope.Subetha.winfos) {
     // tack on to existing namespace
     initSubEthaWinfo();
   }
