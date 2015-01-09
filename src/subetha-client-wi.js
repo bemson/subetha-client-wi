@@ -310,20 +310,20 @@ Use this plugin observe changes in all windows in the network.
       finalResizeInt = setTimeout(updateResizeMetrics, 50);
     }
 
-    function fireAddWindowEvent(wid, winfo) {
-      winAry.fire('add', wid, winfo);
+    function fireAddWindowEvent(winfo) {
+      winAry.fire('add', winfo);
     }
 
-    function fireRemoveWindowEvent(wid, winfo) {
+    function fireRemoveWindowEvent(winfo) {
       // remove current pointer for current window
-      if (wid == sharedHeadObj.wid) {
+      if (winfo.id == sharedHeadObj.wid) {
         winAry.current = null;
       }
-      winAry.fire('remove', wid, winfo);
+      winAry.fire('remove', winfo);
     }
 
-    function fireUpdateWindowEvent(wid, winfo, changes) {
-      winAry.fire('update', wid, winfo, changes);
+    function fireUpdateWindowEvent(winfo, changes) {
+      winAry.fire('update', winfo, changes);
     }
 
     function updateWindowMetrics(data) {
@@ -363,7 +363,7 @@ Use this plugin observe changes in all windows in the network.
 
       // notify self
       next(function () {
-        fireUpdateWindowEvent(windowId, deets, changed);
+        fireUpdateWindowEvent(deets, changed);
       });
     }
 
@@ -383,7 +383,7 @@ Use this plugin observe changes in all windows in the network.
       for (wid in winObjs) {
         if (protoHas.call(winObjs, wid)) {
           windoid = winObjs[wid];
-          fireRemoveWindowEvent(windoid.id, windoid.deets);
+          fireRemoveWindowEvent(windoid.deets);
         }
       }
       winObjs = {};
@@ -463,7 +463,8 @@ Use this plugin observe changes in all windows in the network.
               cnt: sharedHeadObj.cnt,
               deets: mix(
                 {
-                  focus: hasFocus()
+                  focus: hasFocus(),
+                  id: windowId
                 },
                 getWindowPosition(),
                 getWindowDimensions(),
@@ -481,7 +482,7 @@ Use this plugin observe changes in all windows in the network.
             // announce this window to self next
             next(function () {
               // add "self" flag, to indicate that this is the current window
-              fireAddWindowEvent(windowId, mix({current:true}, winMetrics.deets));
+              fireAddWindowEvent(mix({current:true}, winMetrics.deets));
             });
             setTimeout(function () {
               // introduce this window to peers
@@ -577,7 +578,7 @@ Use this plugin observe changes in all windows in the network.
             // remove window info object
             delete winObjs[wid];
             // announce removal of window
-            fireRemoveWindowEvent(wid, winfo.deets);
+            fireRemoveWindowEvent(winfo.deets);
           }
         })
       ;
@@ -650,9 +651,9 @@ Use this plugin observe changes in all windows in the network.
         winfo.cnt = payload.cnt;
 
         if (adding) {
-          fireAddWindowEvent(wid, winfo.deets);
+          fireAddWindowEvent(winfo.deets);
         } else {
-          fireUpdateWindowEvent(wid, winfo.deets, deets);
+          fireUpdateWindowEvent(winfo.deets, deets);
         }
       };
 

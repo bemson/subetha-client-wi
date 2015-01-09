@@ -1,4 +1,5 @@
-<html>
+<!doctype html>
+<html lang="en">
 <head>
 <style>
   body {
@@ -9,11 +10,23 @@
   #screen {
     height:80vm; width:100vm; /* IE9 fallback */
     width: 100vmin;
+    background: #999;
+  }
+
+  .abs-center {
     position: absolute;
     top:0;bottom:0;
     left:0;right:0;
     margin: auto;
-    background: #999;
+  }
+
+  #screen > .sign {
+    height: 1em;
+    text-align: center;
+    font-size: 7vmin;
+    width: 80%;
+    font-family: "arial black";
+    color: #666;
   }
 
   #screen > .window {
@@ -52,16 +65,21 @@
   }
 </style>
   <script src="../subetha/subetha.min.js"></script>
-  <script src="../subetha-client-winfo/src/subetha-client-winfo.js"></script>
+  <script src="src/subetha-client-wi.js"></script>
   <script>
 var
   availTop = screen.availTop || 0,
   screenWidth = screen.width,
   screenHeight = screen.height - availTop,
-  winfo = Subetha.winfo,
+  winfos = Subetha.winfos,
   inited,
   $screen = document.createElement('div'),
   windoidTpl = $screen.cloneNode();
+
+// add text to screen
+$screen.appendChild($screen.cloneNode());
+$screen.firstChild.innerHTML = 'SubEtha WI Demo';
+$screen.firstChild.className = 'abs-center sign';
 
 windoidTpl.setAttribute('class', 'window');
 windoidTpl.appendChild($screen.cloneNode());
@@ -71,18 +89,8 @@ windoidTpl.lastChild.appendChild($screen.cloneNode());
 windoidTpl.appendChild($screen.cloneNode());
 
 $screen.setAttribute('id', 'screen');
+$screen.className = 'abs-center';
 $screen.style.height = screenHeight/screenWidth * 100 + ((document.all) ? 'vm' : 'vmin');
-
-
-function updateWindoid(ref, deets) {
-  if (typeof ref == 'string') {
-    ref = $screen.querySelector('div[data-wid="' + ref + '"]');
-    if (!ref) {
-      return;
-    }
-  }
-  setWindoid(ref, deets);
-}
 
 function setWindoid(windoid, deets) {
   var
@@ -120,9 +128,11 @@ function getPercentOfHeight(n) {
   return n/screenHeight * 100;
 }
 
-winfo
-  .on('add', function (id, deets) {
-    var wind = windoidTpl.cloneNode(true);
+winfos
+  .on('add', function (winfo) {
+    var
+      id = winfo.id,
+      wind = windoidTpl.cloneNode(true);
 
     if (!inited) {
       inited = 1;
@@ -131,13 +141,19 @@ winfo
 
     wind.setAttribute('data-wid', id);
     wind.childNodes[1].innerHTML = id;
-    setWindoid(wind, deets);
+    setWindoid(wind, winfo);
 
     $screen.appendChild(wind);
   })
-  .on('update', updateWindoid)
-  .on('remove', function (id) {
-    var $wind = $screen.querySelector('div[data-wid="' + id + '"]');
+  .on('update', function (winfo) {
+    var el = $screen.querySelector('div[data-wid="' + winfo.id + '"]');
+    if (!el) {
+      return;
+    }
+    setWindoid(el, winfo);
+  })
+  .on('remove', function (winfo) {
+    var $wind = $screen.querySelector('div[data-wid="' + winfo.id + '"]');
     if (!$wind) {
       return;
     }
