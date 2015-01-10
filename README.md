@@ -7,7 +7,9 @@ by Bemi Faison
 
 ## Description
 
-SubEtha Window Information (or WI) is a Subetha-Client plugin that provides a spatial model of non-framed windows. WI publishes the window activity and metrics of each document using the plugin.
+SubEtha Window Information (or WI) is a Subetha-Client plugin that provides a spatial model of non-framed windows. WI publishes window activity and metrics of each document using the plugin.
+
+To observe WI in action, open this [visualizer demo](http://rawgit.com/bemson/subetha-client-wi/master/wi_demo_visualizer.html) in several windows.
 
 **Note:** Please see the [Subetha project page](https://github.com/bemson/subetha), for important background information, plus development, implementation, and security considerations.
 
