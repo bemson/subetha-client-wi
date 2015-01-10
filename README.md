@@ -182,6 +182,20 @@ Below is reference documentation for the SubEtha Window Information module - whi
 
 ### Subetha::winfos
 
+An array of winfo objects, describing each window in the network.
+
+##### WI events
+
+The array is also an event emitter that fires the following events.
+
+  * **add** - Triggered when a winfo object is added to the winfos array.
+    - `winfo`  - The winfo object added to the array.
+  * **remove** - Triggered when a winfo object is removed from the winfos array.
+    - `winfo`  - The winfo object removed to the array.
+  * **update** - Triggered when one or more properties of a winfo object have 
+    - `winfo`  - The winfo object from the array.
+    - `changes`  - A hash of updated changed properties and their previous value.
+
 #### winfos#start()
 
 Begin monitoring this and other windows.
@@ -210,15 +224,15 @@ Returns `true` when the network is changed from active to inactive. Otherwise, `
 
 The winfo object of the current window, when actively monitoring a network. Otherwise, when inactive, this is a `null` reference.
 
-#### winfos@url
-
-A string reflecting the last/currently active (bridge) url. This property is used when calling `winfos.start()` with no arguments, and updated when called with arguments.
-
 #### winfos@unsupported
 
 A boolean indicating when the WI plugin can not work with the given docuemnt.
 
 This property should be considered _read-only_ and is set during plugin initialization. The value will be `false` for iframed documents.
+
+#### winfos@url
+
+A string reflecting the last/currently active (bridge) url. This property is used when calling `winfos.start()` with no arguments, and updated when called with arguments.
 
 
 ## Installation
